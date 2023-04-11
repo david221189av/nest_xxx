@@ -1,53 +1,71 @@
 import {
   Controller,
-  Param,
-  Delete,
   Get,
   Post,
   Put,
+  Param,
   Body,
+  NotFoundException,
   HttpCode,
   HttpStatus,
-  Header,
+  Delete,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
-import { CreateAuthorDto } from './dto/create-author.dto';
-import { UpdateAuthorDto } from './dto/update-author.dto';
-import { Author } from './schemas/author.schema';
-import { AuthorsService } from './services/authors.service';
+import { Author } from './author.entity';
+import { AuthorService } from './author.service';
+import { CreateAuthorDTO } from './author.dto';
+import { BookService } from 'src/books/book.service';
+import { Book } from 'src/books/book.entity';
 
 @Controller('authors')
-export class AuthorsController {
-  constructor(private readonly authorService: AuthorsService) {}
+export default class AuthorsController {
+  constructor(
+    private readonly authorService: AuthorService,
+    private readonly bookService: BookService,
+  ) {}
 
   @Get()
-  getAll(): Promise<Author[]> {
-    return this.authorService.getAll();
-  }
-
-  //   getOneAuthor(@Param() params) {
-  @Get(':id')
-  getOneAuthor(@Param('id') id: string): Promise<Author> {
-    return this.authorService.getById(id);
+  async getAuthors(): Promise<Author[]> {
+    return await this.authorService.findAll();
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Header('Cache-Control', 'none')
-  create(@Body() createAuthorDto: CreateAuthorDto): Promise<Author> {
-    return this.authorService.create(createAuthorDto);
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async inserAuthor(@Body() author: CreateAuthorDTO): Promise<Author> {
+    return await this.authorService.insert(author);
   }
 
-  @Delete(':id')
-  // @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    return this.authorService.remove(id);
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<Author> {
+    try {
+      // return await this.authorService.findOne(id);
+      return await this.authorService.findOne(id);
+    } catch (e) {
+      throw new NotFoundException('Author Not Found');
+    }
+  }
+
+  @Get(':id/books')
+  async getBookById(@Param('id') id: string): Promise<Book[]> {
+    try {
+      return await this.authorService.findAllBooksByAuthor(id);
+    } catch (e) {
+      throw new NotFoundException('Book Not Found');
+    }
   }
 
   @Put(':id')
-  update(
-    @Body() updateAuthorDto: UpdateAuthorDto,
-    @Param('id') id: string,
-  ): Promise<Author> {
-    return this.authorService.update(id, updateAuthorDto);
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async updateAuthor(@Body() author: Author, @Param('id') id: string) {
+    await this.authorService.update(id, author);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAuthor(@Param('id') id: string): Promise<void> {
+    this.authorService.remove(id);
   }
 }
